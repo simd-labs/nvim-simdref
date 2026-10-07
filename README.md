@@ -1,6 +1,6 @@
 # nvim-simdref
 
-Show the brief of an assembly instruction as an inlay hint. Applies to `.s`/`.asm` files and to C/C++ `asm(...)` blocks. Uses the simdref language server.
+Show the brief of an assembly instruction as an inlay hint.
 
 ![Neovim showing a vaddps inlay hint](https://raw.githubusercontent.com/simd-labs/nvim-simdref/screenshots/nvim-asm.png)
 
@@ -9,11 +9,9 @@ Show the brief of an assembly instruction as an inlay hint. Applies to `.s`/`.as
 ## Requirements
 
 - Neovim 0.11 or newer
-- One of: `uv`, or `python3` 3.10 or newer
+- `uv`, or `python3` 3.10 or newer
 
 ## Install
-
-Install the server from PyPI. Or let the plugin do it on the first run.
 
 With `uv`:
 
@@ -22,7 +20,7 @@ uv tool install simdref
 isa update
 ```
 
-With a venv, when `uv` is not there:
+With a venv and no `uv`:
 
 ```sh
 python3 -m venv ~/.local/share/nvim/simdref/venv
@@ -30,7 +28,7 @@ python3 -m venv ~/.local/share/nvim/simdref/venv
 ~/.local/share/nvim/simdref/venv/bin/isa update
 ```
 
-If the plugin finds no server, it installs the server in the background in `stdpath('data')/simdref` and starts the server when the install is complete. The plugin does not install into the plugin dir.
+Without a server on `PATH`, the plugin installs it in the background to `stdpath('data')/simdref`, then starts it.
 
 ## Setup
 
@@ -46,9 +44,9 @@ With vim.pack (Neovim 0.12+):
 vim.pack.add({ 'https://github.com/simd-labs/nvim-simdref' })
 ```
 
-Or copy the repo directory into a directory on the `packpath` in `pack/*/start/`.
+Or copy the repo into `pack/*/start/` on the `packpath`.
 
-The plugin starts the server on `asm`, `nasm`, `c`, `cpp` and `cuda` buffers and activates inlay hints. Set `vim.g.simdref_disable = true` before the plugin loads to turn it off.
+The plugin starts the server on `asm`, `nasm`, `c`, `cpp` and `cuda` buffers. Set `vim.g.simdref_disable = true` before the plugin loads to turn it off.
 
 If the server is not on `PATH` and the install does not run, the plugin shows:
 
@@ -57,17 +55,12 @@ simdref-lsp not found. Run: uv tool install simdref && isa update
 https://github.com/simd-labs/simdref
 ```
 
-Neovim shows the full hint text, for example `vaddps` shows `Add Packed Single Precision Floating-Point Values`.
-
 ## Test
 
 ```sh
-# hint test: needs simdref-lsp on PATH and a catalog (isa update)
 SIMDREF_CATALOG=~/.local/share/simdref/catalog.db \
   nvim --headless -u NONE --cmd 'set rtp+=.' -l test/run.lua
-# missing-binary test: no uv, no python3
 nvim --headless -u NONE --cmd 'set rtp+=.' -l test/missing.lua
-# container rig (rootless podman, debian sid + neovim 0.12)
 podman build --build-arg WITH_UV=0 -t nvim-simdref-test:no-uv -f test/podman/Containerfile .
 podman run --rm --userns=keep-id -v "$PWD:/src:ro,Z" --network host nvim-simdref-test:no-uv
 ```
