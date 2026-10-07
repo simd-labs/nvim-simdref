@@ -1,8 +1,10 @@
 # nvim-simdref
 
-Show the brief of an assembly instruction as an inlay hint. Works in `.s`/`.asm` files and in C/C++ `asm(...)` blocks. Uses the simdref language server.
+Show the brief of an assembly instruction as an inlay hint. Applies to `.s`/`.asm` files and to C/C++ `asm(...)` blocks. Uses the simdref language server.
 
 ![Neovim showing a vaddps inlay hint](https://raw.githubusercontent.com/simd-labs/nvim-simdref/screenshots/nvim-asm.png)
+
+`K` on an instruction (vim.lsp.buf.hover) shows the full simdref page from the local catalog, no network. `gx` on a URL in it opens the link.
 
 ## Requirements
 
@@ -11,7 +13,7 @@ Show the brief of an assembly instruction as an inlay hint. Works in `.s`/`.asm`
 
 ## Install
 
-Install the server from PyPI (simdref 0.0.8 or newer). Or let the plugin do it on the first run.
+Install the server from PyPI. Or let the plugin do it on the first run.
 
 With `uv`:
 
@@ -20,7 +22,7 @@ uv tool install simdref
 isa update
 ```
 
-Or with a venv, if you do not have `uv`:
+With a venv, when `uv` is not there:
 
 ```sh
 python3 -m venv ~/.local/share/nvim/simdref/venv
@@ -28,7 +30,7 @@ python3 -m venv ~/.local/share/nvim/simdref/venv
 ~/.local/share/nvim/simdref/venv/bin/isa update
 ```
 
-If no server is found, the plugin installs it in the background in `stdpath('data')/simdref` and starts it when the install is done. It never installs into the plugin dir.
+If the plugin finds no server, it installs the server in the background in `stdpath('data')/simdref` and starts the server when the install is complete. The plugin does not install into the plugin dir.
 
 ## Setup
 
@@ -44,9 +46,9 @@ With vim.pack (Neovim 0.12+):
 vim.pack.add({ 'https://github.com/simd-labs/nvim-simdref' })
 ```
 
-Or copy the repo directory into a directory on your `packpath` under `pack/*/start/`.
+Or copy the repo directory into a directory on the `packpath` in `pack/*/start/`.
 
-The plugin starts the server on `asm`, `nasm`, `c`, `cpp` and `cuda` buffers and turns on inlay hints. Set `vim.g.simdref_disable = true` before the plugin loads to turn it off.
+The plugin starts the server on `asm`, `nasm`, `c`, `cpp` and `cuda` buffers and activates inlay hints. Set `vim.g.simdref_disable = true` before the plugin loads to turn it off.
 
 If the server is not on `PATH` and the install does not run, the plugin shows:
 
