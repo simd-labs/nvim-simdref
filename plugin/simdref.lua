@@ -1,6 +1,6 @@
 local data_dir = vim.fn.stdpath('data') .. '/simdref'
 local is_win = vim.fn.has('win32') == 1
-local bin_dir = data_dir .. (is_win and '/bin' or '/bin')
+local bin_dir = data_dir .. '/bin'
 local venv_bin = data_dir .. (is_win and '/venv/Scripts' or '/venv/bin')
 local exe = is_win and '.exe' or ''
 
@@ -66,6 +66,10 @@ local function start_after_install(bin)
 end
 
 local function install()
+  if vim.g.simdref_installing then
+    return
+  end
+  vim.g.simdref_installing = true
   if on_path('uv') then
     local env = { UV_TOOL_DIR = data_dir .. '/tools', UV_TOOL_BIN_DIR = bin_dir }
     vim.system({ 'uv', 'tool', 'install', 'simdref' }, { env = env, text = true }, function(r)
