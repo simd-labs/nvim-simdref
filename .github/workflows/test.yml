@@ -1,0 +1,21 @@
+name: test
+on: [push, pull_request]
+jobs:
+  hint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: install neovim 0.11+
+        run: |
+          curl -LO https://github.com/neovim/neovim/releases/latest/download/nvim-linux-x86_64.appimage
+          chmod +x nvim-linux-x86_64.appimage
+          sudo mv nvim-linux-x86_64.appimage /usr/local/bin/nvim
+      - name: install simdref
+        run: |
+          pip install --user 'simdref>=0.0.8'
+          export PATH="$HOME/.local/bin:$PATH"
+          isa update
+      - name: run hint test
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          nvim --headless -u NONE --cmd 'set rtp+=.' -l test/run.lua
