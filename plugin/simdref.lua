@@ -90,10 +90,9 @@ local function read_isa_version(isa, env, cb)
   end)
 end
 
--- Upgrade the private simdref at most once every 24 h. On a version change
--- the follow-up `isa vaddps --short` runs ensure_runtime(), which downloads
--- the new catalog only because the version stamp differs. A PATH simdref is
--- never touched: this runs only when server_cmd() resolved the private copy.
+-- The follow-up `isa vaddps --short` runs ensure_runtime(), which downloads
+-- the new catalog only because the version stamp differs. Runs only when
+-- server_cmd() resolved the private copy, so a PATH simdref is never touched.
 local function auto_update()
   if vim.g.simdref_auto_updated then
     return
@@ -135,22 +134,20 @@ local function auto_update()
           return
         end
         vim.system({ isa, 'vaddps', '--short' }, { env = env, text = true }, function(r2)
-          notify_debug(
-            r2.code == 0 and ('simdref updated to ' .. after)
-              or ('simdref catalog refresh failed: ' .. (r2.stderr or ''))
-          )
-          if r2.code == 0 then
-            vim.schedule(function()
-              for _, c in ipairs(vim.lsp.get_clients({ name = 'simdref' })) do
-                c:stop()
-              end
-              for _, buf in ipairs(vim.api.nvim_list_bufs()) do
-                if vim.api.nvim_buf_is_loaded(buf) then
-                  vim.lsp.enable('simdref', { bufnr = buf })
-                end
-              end
-            end)
+          if r2.code ~= 0 then
+            notify_debug('simdref catalog refresh failed: ' .. (r2.stderr or ''))
+            return
           end
+          vim.schedule(function()
+            for _, c in ipairs(vim.lsp.get_clients({ name = 'simdref' })) do
+              c:stop()
+            end
+            for _, buf in ipairs(vim.api.nvim_list_bufs()) do
+              if vim.api.nvim_buf_is_loaded(buf) then
+                vim.lsp.enable('simdref', { bufnr = buf })
+              end
+            end
+          end)
         end)
       end)
     end)
