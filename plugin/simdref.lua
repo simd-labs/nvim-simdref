@@ -69,7 +69,9 @@ local function touch(path)
   local fd = vim.uv.fs_open(path, 'w', 420) -- 0644
   if fd then
     vim.uv.fs_close(fd)
+    return true
   end
+  return false
 end
 
 local function notify_debug(msg)
@@ -97,7 +99,9 @@ local function auto_update()
     return
   end
   vim.g.simdref_auto_updated = true
-  local uv_path = on_path('uv') and exists(bin_dir .. '/isa' .. exe)
+  local uv_path = on_path('uv')
+    and exists(bin_dir .. '/isa' .. exe)
+    and exists(data_dir .. '/tools/simdref')
   local pip_path = (not uv_path) and exists(venv_bin .. '/isa' .. exe)
   if not uv_path and not pip_path then
     return
@@ -112,7 +116,10 @@ local function auto_update()
   if st and (os.time() - st.mtime.sec) < 24 * 3600 then
     return
   end
-  touch(stamp)
+  if not touch(stamp) then
+    notify_debug('simdref auto-update: cannot write ' .. stamp)
+    return
+  end
   read_isa_version(isa, env, function(before)
     if not before then
       notify_debug('simdref auto-update: isa --version failed')
@@ -136,6 +143,11 @@ local function auto_update()
             vim.schedule(function()
               for _, c in ipairs(vim.lsp.get_clients({ name = 'simdref' })) do
                 c:stop()
+              end
+              for _, buf in ipairs(vim.api.nvim_list_bufs()) do
+                if vim.api.nvim_buf_is_loaded(buf) then
+                  vim.lsp.enable('simdref', { bufnr = buf })
+                end
               end
             end)
           end
