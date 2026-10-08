@@ -28,7 +28,7 @@ python3 -m venv ~/.local/share/nvim/simdref/venv
 ~/.local/share/nvim/simdref/venv/bin/isa update
 ```
 
-Without a server on `PATH`, the plugin installs it in the background to `stdpath('data')/simdref`, then starts it.
+Without a server on `PATH`, the plugin installs it in the background to `stdpath('data')/simdref`, then starts it. Once a day the plugin upgrades that copy and refreshes the catalog when the version changed. A server on `PATH` is never upgraded.
 
 ## Setup
 

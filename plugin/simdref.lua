@@ -65,6 +65,86 @@ local function start_after_install(bin)
   end
 end
 
+local function touch(path)
+  local fd = vim.uv.fs_open(path, 'w', 420) -- 0644
+  if fd then
+    vim.uv.fs_close(fd)
+  end
+end
+
+local function notify_debug(msg)
+  vim.schedule(function()
+    vim.notify(msg, vim.log.levels.DEBUG, { title = 'simdref' })
+  end)
+end
+
+local function read_isa_version(isa, env, cb)
+  vim.system({ isa, '--version' }, { env = env, text = true }, function(r)
+    if r.code == 0 and r.stdout then
+      cb((r.stdout:gsub('%s+$', '')))
+    else
+      cb(nil)
+    end
+  end)
+end
+
+-- Upgrade the private simdref at most once every 24 h. On a version change
+-- the follow-up `isa vaddps --short` runs ensure_runtime(), which downloads
+-- the new catalog only because the version stamp differs. A PATH simdref is
+-- never touched: this runs only when server_cmd() resolved the private copy.
+local function auto_update()
+  if vim.g.simdref_auto_updated then
+    return
+  end
+  vim.g.simdref_auto_updated = true
+  local uv_path = on_path('uv') and exists(bin_dir .. '/isa' .. exe)
+  local pip_path = (not uv_path) and exists(venv_bin .. '/isa' .. exe)
+  if not uv_path and not pip_path then
+    return
+  end
+  local isa = uv_path and (bin_dir .. '/isa' .. exe) or (venv_bin .. '/isa' .. exe)
+  local env = uv_path and { UV_TOOL_DIR = data_dir .. '/tools', UV_TOOL_BIN_DIR = bin_dir }
+    or nil
+  local upgrade = uv_path and { 'uv', 'tool', 'upgrade', 'simdref' }
+    or { venv_bin .. '/pip' .. exe, 'install', '-U', 'simdref' }
+  local stamp = data_dir .. '/last-update-check'
+  local st = vim.uv.fs_stat(stamp)
+  if st and (os.time() - st.mtime.sec) < 24 * 3600 then
+    return
+  end
+  touch(stamp)
+  read_isa_version(isa, env, function(before)
+    if not before then
+      notify_debug('simdref auto-update: isa --version failed')
+      return
+    end
+    vim.system(upgrade, { env = env, text = true }, function(r)
+      if r.code ~= 0 then
+        notify_debug('simdref auto-update failed: ' .. (r.stderr or ''))
+        return
+      end
+      read_isa_version(isa, env, function(after)
+        if not after or after == before then
+          return
+        end
+        vim.system({ isa, 'vaddps', '--short' }, { env = env, text = true }, function(r2)
+          notify_debug(
+            r2.code == 0 and ('simdref updated to ' .. after)
+              or ('simdref catalog refresh failed: ' .. (r2.stderr or ''))
+          )
+          if r2.code == 0 then
+            vim.schedule(function()
+              for _, c in ipairs(vim.lsp.get_clients({ name = 'simdref' })) do
+                c:stop()
+              end
+            end)
+          end
+        end)
+      end)
+    end)
+  end)
+end
+
 local function install()
   if vim.g.simdref_installing then
     return
@@ -130,6 +210,9 @@ if not vim.g.simdref_disable then
   if cmd then
     enable(cmd)
     installed = true
+    if cmd[1] ~= 'simdref-lsp' then
+      auto_update()
+    end
   else
     install()
   end
