@@ -81,6 +81,15 @@ local TIMEOUT_MS = 10 * 60 * 1000
 -- check; when the version did not change this costs ~0.4 s and downloads
 -- nothing. Runs only when server_cmd() resolved the private copy, so a
 -- PATH simdref is never touched.
+local function fire(cmd, opts, cb)
+  -- vim.system raises ENOENT when the executable is missing; a raise escapes
+  -- the auto-update and surfaces as an error. pcall it into the DEBUG notify.
+  local ok, err = pcall(vim.system, cmd, opts, cb)
+  if not ok then
+    notify_debug('simdref auto-update spawn failed: ' .. tostring(err))
+  end
+end
+
 local function auto_update()
   if vim.g.simdref_auto_updated then
     return
@@ -120,13 +129,13 @@ local function auto_update()
       end
     end
   end
-  vim.system(upgrade, { env = env, text = true, timeout = TIMEOUT_MS }, function(r)
+  fire(upgrade, { env = env, text = true, timeout = TIMEOUT_MS }, function(r)
     if r.code ~= 0 then
       notify_debug('simdref auto-update failed: ' .. (r.stderr or ''))
     end
     -- The refresh always runs, also when the upgrade failed: an offline
     -- upgrade must not block repairing a catalog.
-    vim.system({ isa, 'vaddps', '--short' }, { env = env, text = true, timeout = TIMEOUT_MS }, function(r2)
+    fire({ isa, 'vaddps', '--short' }, { env = env, text = true, timeout = TIMEOUT_MS }, function(r2)
       if r2.code ~= 0 then
         notify_debug('simdref catalog refresh failed: ' .. (r2.stderr or ''))
       end
