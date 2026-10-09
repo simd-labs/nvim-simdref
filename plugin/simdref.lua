@@ -65,15 +65,6 @@ local function start_after_install(bin)
   end
 end
 
-local function touch(path)
-  local fd = vim.uv.fs_open(path, 'w', 420) -- 0644
-  if fd then
-    vim.uv.fs_close(fd)
-    return true
-  end
-  return false
-end
-
 local function notify_debug(msg)
   vim.schedule(function()
     vim.notify(msg, vim.log.levels.DEBUG, { title = 'simdref' })
@@ -94,39 +85,12 @@ local function read_isa_version(isa, env, cb)
   end)
 end
 
-local lock_path
-local function lock_release()
-  if lock_path then
-    vim.uv.fs_unlink(lock_path)
-    lock_path = nil
-  end
-end
-
--- Share one lock with the other editor extensions: two uv processes on one
--- tool dir corrupt the venv. Exclusive create; a fresh lock (< 30 min) means
--- another extension holds it, a stale one is taken over. Always removed.
-local LOCK_STALE = 30 * 60
-local function lock_acquire(dir)
-  local path = dir .. '/update.lock'
-  local st = vim.uv.fs_stat(path)
-  if st then
-    if (os.time() - st.mtime.sec) < LOCK_STALE then
-      return false
-    end
-    vim.uv.fs_unlink(path)
-  end
-  local fd = vim.uv.fs_open(path, 'wx', 420) -- 0644
-  if not fd then
-    return false
-  end
-  vim.uv.fs_close(fd)
-  lock_path = path
-  return true
-end
-
--- `isa vaddps --short` runs ensure_runtime(); when the version did not
--- change this costs ~0.4 s and downloads nothing. Runs only when
--- server_cmd() resolved the private copy, so a PATH simdref is never touched.
+-- One check per day, gated by an exclusive marker file for today's UTC day.
+-- Several editor processes share the private install: only the one that
+-- creates the marker runs the check. `isa vaddps --short` runs on every
+-- check; when the version did not change this costs ~0.4 s and downloads
+-- nothing. Runs only when server_cmd() resolved the private copy, so a
+-- PATH simdref is never touched.
 local function auto_update()
   if vim.g.simdref_auto_updated then
     return
@@ -144,19 +108,27 @@ local function auto_update()
     or nil
   local upgrade = uv_path and { 'uv', 'tool', 'upgrade', 'simdref' }
     or { venv_bin .. '/pip' .. exe, 'install', '-U', 'simdref' }
-  if not lock_acquire(data_dir) then
+  local today = math.floor(os.time() / 86400)
+  local marker = data_dir .. '/update-' .. today
+  -- shortcut: a check still running at midnight UTC can overlap the next
+  -- day's check, add an OS lock if that is ever reported.
+  local fd = vim.uv.fs_open(marker, 'wx', 420) -- 0644
+  if not fd then
     return
   end
-  local stamp = data_dir .. '/last-update-check'
-  local st = vim.uv.fs_stat(stamp)
-  if st and (os.time() - st.mtime.sec) < 24 * 3600 then
-    lock_release()
-    return
-  end
-  if not touch(stamp) then
-    lock_release()
-    notify_debug('simdref auto-update: cannot write ' .. stamp)
-    return
+  vim.uv.fs_close(fd)
+  -- Delete stale markers of older days; today's marker stays.
+  local scan = vim.uv.fs_scandir(data_dir)
+  if scan then
+    while true do
+      local name = vim.uv.fs_scandir_next(scan)
+      if not name then
+        break
+      end
+      if name:match('^update%-') and name ~= ('update-' .. today) then
+        pcall(vim.uv.fs_unlink, data_dir .. '/' .. name)
+      end
+    end
   end
   read_isa_version(isa, env, function(before)
     -- before may be nil (unreadable); the check still runs.
@@ -171,7 +143,6 @@ local function auto_update()
           notify_debug('simdref catalog refresh failed: ' .. (r2.stderr or ''))
         end
         read_isa_version(isa, env, function(after)
-          lock_release()
           if not after or after == before then
             return
           end
