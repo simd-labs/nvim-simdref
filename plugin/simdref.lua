@@ -159,17 +159,13 @@ local function auto_update()
     return
   end
   read_isa_version(isa, env, function(before)
-    if not before then
-      lock_release()
-      notify_debug('simdref auto-update: isa --version failed')
-      return
-    end
+    -- before may be nil (unreadable); the check still runs.
     vim.system(upgrade, { env = env, text = true, timeout = TIMEOUT_MS }, function(r)
       if r.code ~= 0 then
-        lock_release()
         notify_debug('simdref auto-update failed: ' .. (r.stderr or ''))
-        return
       end
+      -- The refresh always runs, also when the upgrade failed: an offline
+      -- upgrade must not block repairing a catalog.
       vim.system({ isa, 'vaddps', '--short' }, { env = env, text = true, timeout = TIMEOUT_MS }, function(r2)
         if r2.code ~= 0 then
           notify_debug('simdref catalog refresh failed: ' .. (r2.stderr or ''))
@@ -180,12 +176,20 @@ local function auto_update()
             return
           end
           vim.schedule(function()
-            for _, c in ipairs(vim.lsp.get_clients({ name = 'simdref' })) do
+            local clients = vim.lsp.get_clients({ name = 'simdref' })
+            for _, c in ipairs(clients) do
               c:stop()
             end
-            vim.defer_fn(function()
-              vim.cmd.doautoall('nvim.lsp.enable FileType')
-            end, 2000)
+            -- Wait for the stopped clients to exit, bounded at 10 s.
+            vim.wait(10000, function()
+              for _, c in ipairs(clients) do
+                if not c:is_stopped() then
+                  return false
+                end
+              end
+              return true
+            end, 100)
+            vim.cmd.doautoall('nvim.lsp.enable FileType')
           end)
         end)
       end)
