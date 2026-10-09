@@ -80,8 +80,12 @@ local function notify_debug(msg)
   end)
 end
 
+-- Every vim.system gets a 10 min timeout; a stuck uv or isa must not hang
+-- the update path forever.
+local TIMEOUT_MS = 10 * 60 * 1000
+
 local function read_isa_version(isa, env, cb)
-  vim.system({ isa, '--version' }, { env = env, text = true }, function(r)
+  vim.system({ isa, '--version' }, { env = env, text = true, timeout = TIMEOUT_MS }, function(r)
     if r.code == 0 and r.stdout then
       cb((r.stdout:gsub('%s+$', '')))
     else
@@ -90,8 +94,38 @@ local function read_isa_version(isa, env, cb)
   end)
 end
 
--- The follow-up `isa vaddps --short` runs ensure_runtime(), which downloads
--- the new catalog only because the version stamp differs. Runs only when
+local lock_path
+local function lock_release()
+  if lock_path then
+    vim.uv.fs_unlink(lock_path)
+    lock_path = nil
+  end
+end
+
+-- Share one lock with the other editor extensions: two uv processes on one
+-- tool dir corrupt the venv. Exclusive create; a fresh lock (< 30 min) means
+-- another extension holds it, a stale one is taken over. Always removed.
+local LOCK_STALE = 30 * 60
+local function lock_acquire(dir)
+  local path = dir .. '/update.lock'
+  local st = vim.uv.fs_stat(path)
+  if st then
+    if (os.time() - st.mtime.sec) < LOCK_STALE then
+      return false
+    end
+    vim.uv.fs_unlink(path)
+  end
+  local fd = vim.uv.fs_open(path, 'wx', 420) -- 0644
+  if not fd then
+    return false
+  end
+  vim.uv.fs_close(fd)
+  lock_path = path
+  return true
+end
+
+-- `isa vaddps --short` runs ensure_runtime(); when the version did not
+-- change this costs ~0.4 s and downloads nothing. Runs only when
 -- server_cmd() resolved the private copy, so a PATH simdref is never touched.
 local function auto_update()
   if vim.g.simdref_auto_updated then
@@ -110,43 +144,48 @@ local function auto_update()
     or nil
   local upgrade = uv_path and { 'uv', 'tool', 'upgrade', 'simdref' }
     or { venv_bin .. '/pip' .. exe, 'install', '-U', 'simdref' }
+  if not lock_acquire(data_dir) then
+    return
+  end
   local stamp = data_dir .. '/last-update-check'
   local st = vim.uv.fs_stat(stamp)
   if st and (os.time() - st.mtime.sec) < 24 * 3600 then
+    lock_release()
     return
   end
   if not touch(stamp) then
+    lock_release()
     notify_debug('simdref auto-update: cannot write ' .. stamp)
     return
   end
   read_isa_version(isa, env, function(before)
     if not before then
+      lock_release()
       notify_debug('simdref auto-update: isa --version failed')
       return
     end
-    vim.system(upgrade, { env = env, text = true }, function(r)
+    vim.system(upgrade, { env = env, text = true, timeout = TIMEOUT_MS }, function(r)
       if r.code ~= 0 then
+        lock_release()
         notify_debug('simdref auto-update failed: ' .. (r.stderr or ''))
         return
       end
-      read_isa_version(isa, env, function(after)
-        if not after or after == before then
-          return
+      vim.system({ isa, 'vaddps', '--short' }, { env = env, text = true, timeout = TIMEOUT_MS }, function(r2)
+        if r2.code ~= 0 then
+          notify_debug('simdref catalog refresh failed: ' .. (r2.stderr or ''))
         end
-        vim.system({ isa, 'vaddps', '--short' }, { env = env, text = true }, function(r2)
-          if r2.code ~= 0 then
-            notify_debug('simdref catalog refresh failed: ' .. (r2.stderr or ''))
+        read_isa_version(isa, env, function(after)
+          lock_release()
+          if not after or after == before then
             return
           end
           vim.schedule(function()
             for _, c in ipairs(vim.lsp.get_clients({ name = 'simdref' })) do
               c:stop()
             end
-            for _, buf in ipairs(vim.api.nvim_list_bufs()) do
-              if vim.api.nvim_buf_is_loaded(buf) then
-                vim.lsp.enable('simdref', { bufnr = buf })
-              end
-            end
+            vim.defer_fn(function()
+              vim.cmd.doautoall('nvim.lsp.enable FileType')
+            end, 2000)
           end)
         end)
       end)
