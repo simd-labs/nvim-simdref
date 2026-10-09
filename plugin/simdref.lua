@@ -75,16 +75,6 @@ end
 -- the update path forever.
 local TIMEOUT_MS = 10 * 60 * 1000
 
-local function read_isa_version(isa, env, cb)
-  vim.system({ isa, '--version' }, { env = env, text = true, timeout = TIMEOUT_MS }, function(r)
-    if r.code == 0 and r.stdout then
-      cb((r.stdout:gsub('%s+$', '')))
-    else
-      cb(nil)
-    end
-  end)
-end
-
 -- One check per day, gated by an exclusive marker file for today's UTC day.
 -- Several editor processes share the private install: only the one that
 -- creates the marker runs the check. `isa vaddps --short` runs on every
@@ -130,40 +120,16 @@ local function auto_update()
       end
     end
   end
-  read_isa_version(isa, env, function(before)
-    -- before may be nil (unreadable); the check still runs.
-    vim.system(upgrade, { env = env, text = true, timeout = TIMEOUT_MS }, function(r)
-      if r.code ~= 0 then
-        notify_debug('simdref auto-update failed: ' .. (r.stderr or ''))
+  vim.system(upgrade, { env = env, text = true, timeout = TIMEOUT_MS }, function(r)
+    if r.code ~= 0 then
+      notify_debug('simdref auto-update failed: ' .. (r.stderr or ''))
+    end
+    -- The refresh always runs, also when the upgrade failed: an offline
+    -- upgrade must not block repairing a catalog.
+    vim.system({ isa, 'vaddps', '--short' }, { env = env, text = true, timeout = TIMEOUT_MS }, function(r2)
+      if r2.code ~= 0 then
+        notify_debug('simdref catalog refresh failed: ' .. (r2.stderr or ''))
       end
-      -- The refresh always runs, also when the upgrade failed: an offline
-      -- upgrade must not block repairing a catalog.
-      vim.system({ isa, 'vaddps', '--short' }, { env = env, text = true, timeout = TIMEOUT_MS }, function(r2)
-        if r2.code ~= 0 then
-          notify_debug('simdref catalog refresh failed: ' .. (r2.stderr or ''))
-        end
-        read_isa_version(isa, env, function(after)
-          if not after or after == before then
-            return
-          end
-          vim.schedule(function()
-            local clients = vim.lsp.get_clients({ name = 'simdref' })
-            for _, c in ipairs(clients) do
-              c:stop()
-            end
-            -- Wait for the stopped clients to exit, bounded at 10 s.
-            vim.wait(10000, function()
-              for _, c in ipairs(clients) do
-                if not c:is_stopped() then
-                  return false
-                end
-              end
-              return true
-            end, 100)
-            vim.cmd.doautoall('nvim.lsp.enable FileType')
-          end)
-        end)
-      end)
     end)
   end)
 end
