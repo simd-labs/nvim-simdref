@@ -2,7 +2,7 @@
 
 Show the brief of an assembly instruction as an inlay hint.
 
-![Neovim showing a vaddps inlay hint](https://raw.githubusercontent.com/simd-labs/nvim-simdref/screenshots/nvim-asm.png)
+![Neovim showing a vaddps inlay hint](https://raw.githubusercontent.com/simd-labs/nvim-simdref/1078d38aa356b4427a263ed7b668ea8f20b662e1/nvim-asm.png)
 
 `K` on an instruction (vim.lsp.buf.hover) shows the full simdref page from the local catalog, no network. `gx` on a URL in it opens the link.
 
