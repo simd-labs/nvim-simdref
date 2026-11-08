@@ -1,8 +1,9 @@
 -- Venv-fallback test. Launch with:
---   PATH=/usr/bin XDG_DATA_HOME=<scratch>/data nvim --headless -u NONE \
---     --cmd 'set rtp+=.' -l test/fallback.lua
--- The PATH has python3 but no uv and no simdref-lsp, so the plugin must build
--- a venv in stdpath('data')/simdref, install simdref and serve hints.
+--   PATH=<dir holding only python3> XDG_DATA_HOME=<scratch>/data \
+--     nvim --headless -u NONE --cmd 'set rtp+=.' -l test/fallback.lua
+-- The PATH has python3 but no uv, no curl and no simdref-lsp, so the pinned
+-- uv download cannot run and the plugin must build a venv in
+-- stdpath('data')/simdref, install simdref and serve hints.
 -- Network is required. Exits non-zero on failure.
 
 local root = vim.fn.fnamemodify(vim.fn.getcwd(), ':p')

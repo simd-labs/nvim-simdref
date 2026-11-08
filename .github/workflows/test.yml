@@ -19,3 +19,12 @@ jobs:
         run: |
           export PATH="$HOME/.local/bin:$PATH"
           nvim --headless -u NONE --cmd 'set rtp+=.' -l test/run.lua
+      - name: run pinned-uv install test
+        run: |
+          rm -rf /tmp/pinned-match /tmp/pinned-mismatch /tmp/pinned-eexist
+          XDG_DATA_HOME=/tmp/pinned-match \
+            nvim --headless -u NONE --cmd 'set rtp+=.' -l test/pinned.lua
+          PINNED_SCENARIO=mismatch XDG_DATA_HOME=/tmp/pinned-mismatch \
+            nvim --headless -u NONE --cmd 'set rtp+=.' -l test/pinned.lua
+          PINNED_SCENARIO=eexist XDG_DATA_HOME=/tmp/pinned-eexist \
+            nvim --headless -u NONE --cmd 'set rtp+=.' -l test/pinned.lua

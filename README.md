@@ -2,69 +2,49 @@
 
 Show the brief of an assembly instruction as an inlay hint.
 
-![Neovim showing a vaddps inlay hint](https://raw.githubusercontent.com/simd-labs/nvim-simdref/1078d38aa356b4427a263ed7b668ea8f20b662e1/nvim-asm.png)
+![Neovim showing a vaddps inlay hint](https://raw.githubusercontent.com/simd-labs/nvim-simdref/9a3abf1ef173f2ca1a190ae5ed45fbda43a85dcd/nvim-asm.png)
 
-`K` on an instruction (vim.lsp.buf.hover) shows the full simdref page from the local catalog, no network. `gx` on a URL in it opens the link.
+![Neovim showing a vaddps inlay hint in a C++ buffer](https://raw.githubusercontent.com/simd-labs/nvim-simdref/9a3abf1ef173f2ca1a190ae5ed45fbda43a85dcd/nvim-cpp.png)
+
+`K` on an instruction (vim.lsp.buf.hover) shows the full simdref page from the local catalog, no network. `gx` on a URL in it opens the link. Neovim shows the inlay hint label in full; the plugin sets no length cap.
 
 ## Requirements
 
 - Neovim 0.11 or newer
-- `uv`, or `python3` 3.10 or newer
+- `curl` and `tar`, or `uv`, or `python3` 3.10 or newer
 
 ## Install
 
-With `uv`:
+With a plugin manager, add `simd-labs/nvim-simdref` to your `runtimepath`. Without one:
 
-```sh
+```
+git clone https://github.com/simd-labs/nvim-simdref ~/.local/share/nvim/site/nvim-simdref
+```
+
+Then install simdref:
+
+```
 uv tool install simdref
 isa update
 ```
 
-With a venv and no `uv`:
+or:
 
-```sh
-python3 -m venv ~/.local/share/nvim/simdref/venv
-~/.local/share/nvim/simdref/venv/bin/pip install simdref
-~/.local/share/nvim/simdref/venv/bin/isa update
 ```
-
-Without a server on `PATH`, the plugin installs it in the background to `stdpath('data')/simdref`, then starts it. Once a day the plugin upgrades that copy and refreshes the catalog. A new simdref version takes effect at the next server start (`:LspRestart` or a new Neovim). A server on `PATH` is never upgraded.
+pip install simdref
+isa update
+```
 
 ## Setup
 
-With lazy.nvim:
-
-```lua
-{ 'simd-labs/nvim-simdref' }
-```
-
-With vim.pack (Neovim 0.12+):
-
-```lua
-vim.pack.add({ 'https://github.com/simd-labs/nvim-simdref' })
-```
-
-Or copy the repo into `pack/*/start/` on the `packpath`.
-
-The plugin starts the server on `asm`, `nasm`, `c`, `cpp` and `cuda` buffers. Set `vim.g.simdref_disable = true` before the plugin loads to turn it off.
+The plugin starts when a `*.s` or `*.cpp` buffer opens. If the server is not on `PATH`, the plugin installs it in the background to `stdpath('data')/simdref`, then starts it. The install first downloads a pinned uv and checks its sha256; when that fails, the plugin uses `uv` on `PATH` or a `python3` venv. A new simdref version takes effect at the next server start. `:LspRestart` restarts the server without closing Neovim. A server on `PATH` is never upgraded.
 
 If the server is not on `PATH` and the install does not run, the plugin shows:
 
 ```
-simdref-lsp not found. Run: uv tool install simdref && isa update
-https://github.com/simd-labs/simdref
+simdref not found. Install it: uv tool install simdref (or pip install simdref), then run isa update. Instructions: https://github.com/simd-labs/simdref
 ```
 
-## Test
+## Settings
 
-```sh
-SIMDREF_CATALOG=~/.local/share/simdref/catalog.db \
-  nvim --headless -u NONE --cmd 'set rtp+=.' -l test/run.lua
-nvim --headless -u NONE --cmd 'set rtp+=.' -l test/missing.lua
-podman build --build-arg WITH_UV=0 -t nvim-simdref-test:no-uv -f test/podman/Containerfile .
-podman run --rm --userns=keep-id -v "$PWD:/src:ro,Z" --network host nvim-simdref-test:no-uv
-```
-
-## License
-
-GPL-3.0-or-later. See LICENSE.
+`vim.g.simdref_disable` (default `false`): set it before the plugin loads to turn the plugin off.

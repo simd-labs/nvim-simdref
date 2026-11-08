@@ -33,12 +33,9 @@ end
 for _, m in ipairs(seen) do
   print('notify: ' .. m)
 end
-local expected = 'simdref-lsp not found. Run: uv tool install simdref && isa update'
+local expected = 'simdref not found. Install it: uv tool install simdref (or pip install simdref), then run isa update. Instructions: https://github.com/simd-labs/simdref'
 if not tostring(seen[1]):find(expected, 1, true) then
   fail('expected message missing, got: ' .. tostring(seen[1]))
-end
-if not tostring(seen[1]):find('https://github.com/simd-labs/simdref', 1, true) then
-  fail('expected URL missing')
 end
 if not tostring(seen[1]):find('uv not found and python3 is missing or older than 3.10', 1, true) then
   fail('expected install-failure cause missing')

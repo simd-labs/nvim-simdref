@@ -23,13 +23,29 @@ else
   [ $? -ne 0 ] && fail=1
 fi
 
-echo "--- venv fallback test (no uv, no simdref-lsp on PATH) ---"
+echo "--- venv fallback test (no uv, no curl, no simdref-lsp on PATH) ---"
 free -g | head -1
-rm -rf /tmp/home/fb
-mkdir -p /tmp/home/fb
-# /usr/bin:/bin only: python3 present, no uv (uv is in /usr/local/bin), no simdref-lsp.
-env PATH="/usr/bin:/bin" XDG_DATA_HOME=/tmp/home/fb HOME=/tmp/home \
+rm -rf /tmp/home/vbin /tmp/home/fb
+mkdir -p /tmp/home/vbin /tmp/home/fb
+# python3 only: the pinned uv download needs curl, so without it the venv is
+# the only install path.
+ln -s /usr/bin/python3 /tmp/home/vbin/python3
+env PATH="/tmp/home/vbin" XDG_DATA_HOME=/tmp/home/fb HOME=/tmp/home \
   nvim --headless -u NONE --cmd 'set rtp+=.' -l test/fallback.lua
+[ $? -ne 0 ] && fail=1
+
+echo "--- pinned-uv install test (match, fake binaries, no network) ---"
+free -g | head -1
+rm -rf /tmp/home/pm
+env XDG_DATA_HOME=/tmp/home/pm HOME=/tmp/home \
+  nvim --headless -u NONE --cmd 'set rtp+=.' -l test/pinned.lua
+[ $? -ne 0 ] && fail=1
+
+echo "--- pinned-uv install test (mismatch, fake binaries, no network) ---"
+free -g | head -1
+rm -rf /tmp/home/pmm
+env PINNED_SCENARIO=mismatch XDG_DATA_HOME=/tmp/home/pmm HOME=/tmp/home \
+  nvim --headless -u NONE --cmd 'set rtp+=.' -l test/pinned.lua
 [ $? -ne 0 ] && fail=1
 
 echo "--- missing-binary test (no uv, no python3) ---"

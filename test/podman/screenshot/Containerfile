@@ -1,0 +1,9 @@
+FROM localhost/nvim-simdref-test:uv
+
+# Base image: build ../Containerfile with --build-arg WITH_UV=1 and tag it
+# localhost/nvim-simdref-test:uv first.
+# GUI stack for the D5 headless screenshot: Xvfb + xterm + scrot.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends \
+      xvfb xterm scrot x11-apps fontconfig fonts-dejavu-core \
+ && rm -rf /var/lib/apt/lists/*
