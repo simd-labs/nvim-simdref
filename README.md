@@ -37,7 +37,7 @@ isa update
 
 ## Setup
 
-The plugin starts when a `*.s` or `*.cpp` buffer opens. If the server is not on `PATH`, the plugin installs it in the background to `stdpath('data')/simdref`, then starts it. The install first downloads a pinned uv and checks its sha256; when that fails, the plugin uses `uv` on `PATH` or a `python3` venv. A new simdref version takes effect at the next server start. `:LspRestart` restarts the server without closing Neovim. A server on `PATH` is never upgraded.
+The plugin starts when a `*.s`, `*.cpp` or `*.ptx` buffer opens. If the server is not on `PATH`, the plugin installs it in the background to `stdpath('data')/simdref`, then starts it. The install first downloads a pinned uv and checks its sha256; when that fails, the plugin uses `uv` on `PATH` or a `python3` venv. A new simdref version takes effect at the next server start. `:LspRestart` restarts the server without closing Neovim. A server on `PATH` is never upgraded.
 
 If the server is not on `PATH` and the install does not run, the plugin shows:
 

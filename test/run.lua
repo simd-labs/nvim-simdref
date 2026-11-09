@@ -121,4 +121,28 @@ if not clabel then
   fail('no vaddps hint in cpp buffer. Hints: ' .. table.concat(got, ' | '))
 end
 print('PASS: vaddps (.cpp inline asm) -> ' .. clabel)
+
+-- A .ptx buffer must attach and get hints too. Neovim maps .ptx to the
+-- built-in filetype ptx.
+local ptx = root .. '/test/fixtures/sample.ptx'
+vim.cmd.edit(vim.fn.fnameescape(ptx))
+local pbuf = vim.api.nvim_get_current_buf()
+if vim.bo[pbuf].filetype ~= 'ptx' then
+  fail('expected filetype ptx for .ptx, got ' .. vim.bo[pbuf].filetype)
+end
+ok = vim.wait(10000, function()
+  return #vim.lsp.get_clients({ bufnr = pbuf, name = 'simdref' }) > 0
+end, 100)
+if not ok then
+  fail('simdref client did not attach to ptx buffer')
+end
+local phints = {}
+ok = vim.wait(10000, function()
+  phints = vim.lsp.inlay_hint.get({ bufnr = pbuf })
+  return #phints > 0
+end, 200)
+if not ok then
+  fail('no inlay hints returned for ptx buffer')
+end
+print('PASS: .ptx attach + ' .. #phints .. ' hints')
 os.exit(0)

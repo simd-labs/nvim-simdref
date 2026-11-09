@@ -1,0 +1,3 @@
+add.s32 %r1, %r2, %r3;
+ld.global.nc.f32 %f1, [%rd1];
+shfl.sync.idx.b32 %r4, %r5, 0, 31, -1;
